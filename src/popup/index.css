@@ -49,13 +49,68 @@ body {
     cursor: pointer;
 }
 
-#settings-section { 
+#settings-section {
+    padding: 15px;
+    border-top: 1px solid #ccc;
+    margin-top: 15px;
+}
+
+.setting.vertical {
     display: flex;
-    flex-direction: row;
-    flex-shrink: 0;
-    justify-content: center;
-    align-items: center;
-    height: 140px;
+    flex-direction: column;
+    margin-bottom: 15px;
+    gap: 5px;
+}
+
+.setting.vertical label {
+    font-weight: 500;
+    color: #333;
+    font-size: 14px;
+}
+
+.setting.vertical input[type="text"],
+.setting.vertical input[type="password"] {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.setting.vertical input[type="text"]:focus,
+.setting.vertical input[type="password"]:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0,123,255,.25);
+}
+
+.setting.vertical input[type="checkbox"] {
+    margin-top: 5px;
+    width: 16px;
+    height: 16px;
+}
+
+#save-settings {
+    width: 100%;
+    padding: 10px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    margin-top: 10px;
+    transition: background-color 0.2s;
+}
+
+#save-settings:hover {
+    background-color: #0056b3;
+}
+
+#save-settings:active {
+    background-color: #004085;
 }
 
 #colors-section {

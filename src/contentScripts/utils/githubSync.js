@@ -1,7 +1,24 @@
 const GITHUB_API_BASE = 'https://api.github.com';
-const REPO_OWNER = 'thuanpham582002';
-const REPO_NAME = 'thuanpham582002';
-const HIGHLIGHTS_PATH = 'data/highlights.json';
+
+async function getGithubConfig() {
+    const config = await chrome.storage.sync.get({
+        githubToken: '',
+        enableGithubSync: false,
+        githubRepoOwner: '',
+        githubRepoName: '',
+        githubHighlightsPath: 'data/highlights.json'
+    });
+    
+    // Validate required fields
+    if (config.enableGithubSync) {
+        if (!config.githubToken || !config.githubRepoOwner || !config.githubRepoName) {
+            console.error('Missing required GitHub configuration');
+            return null;
+        }
+    }
+    
+    return config;
+}
 
 async function getGithubToken() {
     console.log('Attempting to retrieve GitHub token from storage...');
@@ -28,9 +45,9 @@ async function getGithubToken() {
 }
 
 async function updateGithubFile(content) {
+    const { githubToken, githubRepoOwner, githubRepoName, githubHighlightsPath } = await getGithubConfig();
     console.log('Starting updateGithubFile process...');
-    const token = await getGithubToken();
-    if (!token) {
+    if (!githubToken) {
         console.warn('No GitHub token available. Aborting updateGithubFile.');
         return;
     }
@@ -39,10 +56,10 @@ async function updateGithubFile(content) {
         console.log('Fetching current highlights file from GitHub...');
         // First get the current file (if it exists) to get its SHA
         const currentFileResponse = await fetch(
-            `${GITHUB_API_BASE}/repos/${REPO_OWNER}/${REPO_NAME}/contents/${HIGHLIGHTS_PATH}`,
+            `${GITHUB_API_BASE}/repos/${githubRepoOwner}/${githubRepoName}/contents/${githubHighlightsPath}`,
             {
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'Authorization': `Bearer ${githubToken}`,
                     'Accept': 'application/vnd.github.v3+json'
                 }
             }
@@ -65,11 +82,11 @@ async function updateGithubFile(content) {
         // Update or create the file
         console.log('Sending update/create request to GitHub...');
         const response = await fetch(
-            `${GITHUB_API_BASE}/repos/${REPO_OWNER}/${REPO_NAME}/contents/${HIGHLIGHTS_PATH}`,
+            `${GITHUB_API_BASE}/repos/${githubRepoOwner}/${githubRepoName}/contents/${githubHighlightsPath}`,
             {
                 method: 'PUT',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'Authorization': `Bearer ${githubToken}`,
                     'Accept': 'application/vnd.github.v3+json',
                     'Content-Type': 'application/json',
                 },
@@ -98,19 +115,19 @@ async function updateGithubFile(content) {
 
 // Helper function to test the connection
 async function testGithubConnection() {
+    const { githubToken, githubRepoOwner, githubRepoName } = await getGithubConfig();
     console.log('Testing GitHub connection...');
-    const token = await getGithubToken();
-    if (!token) {
+    if (!githubToken) {
         console.error('No GitHub token found. Cannot test connection.');
         throw new Error('No GitHub token found');
     }
 
     try {
         const response = await fetch(
-            `${GITHUB_API_BASE}/repos/${REPO_OWNER}/${REPO_NAME}`,
+            `${GITHUB_API_BASE}/repos/${githubRepoOwner}/${githubRepoName}`,
             {
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'Authorization': `Bearer ${githubToken}`,
                     'Accept': 'application/vnd.github.v3+json'
                 }
             }
@@ -130,15 +147,15 @@ async function testGithubConnection() {
 }
 
 async function fetchGithubHighlights() {
-    const token = await getGithubToken();
-    if (!token) return null;
+    const { githubToken, githubRepoOwner, githubRepoName, githubHighlightsPath } = await getGithubConfig();
+    if (!githubToken) return null;
 
     try {
         const response = await fetch(
-            `${GITHUB_API_BASE}/repos/${REPO_OWNER}/${REPO_NAME}/contents/${HIGHLIGHTS_PATH}`,
+            `${GITHUB_API_BASE}/repos/${githubRepoOwner}/${githubRepoName}/contents/${githubHighlightsPath}`,
             {
                 headers: {
-                    'Authorization': `token ${token}`,
+                    'Authorization': `token ${githubToken}`,
                     'Accept': 'application/vnd.github.v3+json'
                 }
             }

@@ -2,7 +2,7 @@ import { open as openChangeColorModal } from "./change-color-modal.js";
 import { open as openRemoveAllModal } from "./remove-all-modal.js";
 import { getFromBackgroundPage } from "./utils.js";
 import { fetchGithubHighlights } from '../contentScripts/utils/githubSync.js';
-
+import { testGithubConnection } from '../contentScripts/utils/githubSync.js';
 
 const highlightButton = document.getElementById('toggle-button');
 const removeAllButton = document.getElementById('remove-all-button');
@@ -18,6 +18,8 @@ const highlightsListElement = document.getElementById('highlights-list');
 const highlightsEmptyStateElement = document.getElementById('highlights-list-empty-state');
 const highlightsErrorStateElement = document.getElementById('highlights-list-error-state');
 const highlightsListLostTitleElement = document.getElementById('highlights-list-lost-title');
+
+const DEFAULT_HIGHLIGHTS_PATH = 'data/highlights.json';
 
 
 function colorChanged(colorOption) {
@@ -191,13 +193,24 @@ function showErrorState() {
 
 // Add settings handling
 async function initializeSettings() {
-    // Get DOM elements
     const settingsSection = document.createElement('div');
     settingsSection.id = 'settings-section';
     settingsSection.innerHTML = `
-        <div class="setting">
+        <div class="setting vertical">
             <label for="github-token">GitHub Token:</label>
             <input type="password" id="github-token" placeholder="Enter GitHub token">
+        </div>
+        <div class="setting">
+            <label for="github-repo-owner">Repository Owner:</label>
+            <input type="text" id="github-repo-owner" placeholder="Enter your GitHub username">
+        </div>
+        <div class="setting">
+            <label for="github-repo-name">Repository Name:</label>
+            <input type="text" id="github-repo-name" placeholder="Enter repository name">
+        </div>
+        <div class="setting">
+            <label for="github-highlights-path">Highlights File Path:</label>
+            <input type="text" id="github-highlights-path" placeholder="Enter file path (e.g., data/highlights.json)">
         </div>
         <div class="setting">
             <label for="enable-github-sync">Enable GitHub Sync:</label>
@@ -209,49 +222,60 @@ async function initializeSettings() {
     // Add settings section to the popup
     document.body.appendChild(settingsSection);
 
-    // Get DOM elements after they're added to the document
+    // Get DOM elements
     const tokenInput = document.getElementById('github-token');
+    const repoOwnerInput = document.getElementById('github-repo-owner');
+    const repoNameInput = document.getElementById('github-repo-name');
+    const highlightsPathInput = document.getElementById('github-highlights-path');
     const syncCheckbox = document.getElementById('enable-github-sync');
     const saveButton = document.getElementById('save-settings');
 
     // Load existing settings
-    const { githubToken, enableGithubSync } = await chrome.storage.sync.get({
+    const { 
+        githubToken, 
+        enableGithubSync,
+        githubRepoOwner,
+        githubRepoName,
+        githubHighlightsPath = DEFAULT_HIGHLIGHTS_PATH
+    } = await chrome.storage.sync.get({
         githubToken: '',
-        enableGithubSync: false
+        enableGithubSync: false,
+        githubRepoOwner: '',
+        githubRepoName: '',
+        githubHighlightsPath: DEFAULT_HIGHLIGHTS_PATH
     });
 
     // Set initial values
     tokenInput.value = githubToken;
+    repoOwnerInput.value = githubRepoOwner;
+    repoNameInput.value = githubRepoName;
+    highlightsPathInput.value = githubHighlightsPath;
     syncCheckbox.checked = enableGithubSync;
 
-    // Add save handler
+    // Update save handler
     saveButton.addEventListener('click', async () => {
         try {
+            // Validate inputs
+            if (syncCheckbox.checked) {
+                if (!tokenInput.value) {
+                    throw new Error('GitHub token is required');
+                }
+                if (!repoOwnerInput.value) {
+                    throw new Error('Repository owner is required');
+                }
+                if (!repoNameInput.value) {
+                    throw new Error('Repository name is required');
+                }
+            }
+
             const wasEnabled = enableGithubSync;
             await chrome.storage.sync.set({
                 githubToken: tokenInput.value,
+                githubRepoOwner: repoOwnerInput.value,
+                githubRepoName: repoNameInput.value,
+                githubHighlightsPath: highlightsPathInput.value || DEFAULT_HIGHLIGHTS_PATH,
                 enableGithubSync: syncCheckbox.checked
             });
-            
-            // If GitHub sync was just enabled, fetch and merge data
-            if (!wasEnabled && syncCheckbox.checked) {
-                const githubData = await fetchGithubHighlights();
-                if (githubData) {
-                    const { highlights: localHighlights } = await chrome.storage.local.get({ highlights: {} });
-                    
-                    // Merge GitHub data with local data
-                    const mergedHighlights = {
-                        ...localHighlights,
-                        ...githubData
-                    };
-
-                    // Save merged data back to local storage
-                    await chrome.storage.local.set({ highlights: mergedHighlights });
-                    
-                    // Update the UI to reflect new highlights
-                    await initializeHighlightsList();
-                }
-            }
             
             // Show success message
             saveButton.textContent = 'Saved!';
@@ -264,10 +288,9 @@ async function initializeSettings() {
             }, 2000);
         } catch (error) {
             console.error('Failed to save settings:', error);
-            saveButton.textContent = 'Error!';
+            saveButton.textContent = error.message;
             saveButton.style.backgroundColor = '#f44336';
             
-            // Reset button after 2 seconds
             setTimeout(() => {
                 saveButton.textContent = 'Save Settings';
                 saveButton.style.backgroundColor = '';
