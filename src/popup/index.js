@@ -188,6 +188,36 @@ function showErrorState() {
     updateHighlightsListState();
 })();
 
+// Add settings handling
+async function initializeSettings() {
+    const tokenInput = document.getElementById('github-token');
+    const syncCheckbox = document.getElementById('enable-github-sync');
+    const saveButton = document.getElementById('save-settings');
+
+    const { githubToken, enableGithubSync } = await chrome.storage.sync.get({
+        githubToken: '',
+        enableGithubSync: false
+    });
+
+    tokenInput.value = githubToken;
+    syncCheckbox.checked = enableGithubSync;
+
+    saveButton.addEventListener('click', async () => {
+        await chrome.storage.sync.set({
+            githubToken: tokenInput.value,
+            enableGithubSync: syncCheckbox.checked
+        });
+        // Show success message
+        saveButton.textContent = 'Saved!';
+        setTimeout(() => {
+            saveButton.textContent = 'Save Settings';
+        }, 2000);
+    });
+}
+
+// Call this in your initialization code
+initializeSettings();
+
 // Register Events
 highlightButton.addEventListener('click', toggleHighlighterCursor);
 copyAllButton.addEventListener('click', copyHighlights);

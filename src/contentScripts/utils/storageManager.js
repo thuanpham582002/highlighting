@@ -2,9 +2,18 @@ import { addHighlightError } from './errorManager.js';
 
 import { highlight } from '../highlight/index.js';
 
+import { updateGithubFile } from './githubSync.js';
+
 const STORE_FORMAT_VERSION = chrome.runtime.getManifest().version;
 
 let alternativeUrlIndexOffset = 0; // Number of elements stored in the alternativeUrl Key. Used to map highlight indices to correct key
+
+async function syncWithGithub(highlights) {
+    const { enableGithubSync } = await chrome.storage.sync.get({ enableGithubSync: false });
+    if (enableGithubSync) {
+        await updateGithubFile(highlights);
+    }
+}
 
 async function store(selection, container, url, href, color, textColor) {
     const { highlights } = await chrome.storage.local.get({ highlights: {} });
@@ -25,9 +34,10 @@ async function store(selection, container, url, href, color, textColor) {
         uuid: crypto.randomUUID(),
         createdAt: Date.now(),
     });
-    chrome.storage.local.set({ highlights });
+    
+    await chrome.storage.local.set({ highlights });
+    await syncWithGithub(highlights);
 
-    // Return the index of the new highlight:
     return count - 1 + alternativeUrlIndexOffset;
 }
 
@@ -48,7 +58,8 @@ async function update(highlightIndex, url, alternativeUrl, newColor, newTextColo
             highlightObject.color = newColor;
             highlightObject.textColor = newTextColor;
             highlightObject.updatedAt = Date.now();
-            chrome.storage.local.set({ highlights });
+            await chrome.storage.local.set({ highlights });
+            await syncWithGithub(highlights);
         }
     }
 }
@@ -111,7 +122,8 @@ async function removeHighlight(highlightIndex, url, alternativeUrl) {
         highlights[url].splice(highlightIndex - alternativeUrlIndexOffset, 1);
     }
 
-    chrome.storage.local.set({ highlights });
+    await chrome.storage.local.set({ highlights });
+    await syncWithGithub(highlights);
 }
 
 // alternativeUrl is optional
@@ -124,7 +136,8 @@ async function clearPage(url, alternativeUrl) {
         delete highlights[alternativeUrl];
     }
 
-    chrome.storage.local.set({ highlights });
+    await chrome.storage.local.set({ highlights });
+    await syncWithGithub(highlights);
 }
 
 function elementFromQuery(storedQuery) {
