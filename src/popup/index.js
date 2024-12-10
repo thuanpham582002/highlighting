@@ -1,6 +1,7 @@
 import { open as openChangeColorModal } from "./change-color-modal.js";
 import { open as openRemoveAllModal } from "./remove-all-modal.js";
 import { getFromBackgroundPage } from "./utils.js";
+import { fetchGithubHighlights } from '../contentScripts/utils/githubSync.js';
 
 
 const highlightButton = document.getElementById('toggle-button');
@@ -190,33 +191,93 @@ function showErrorState() {
 
 // Add settings handling
 async function initializeSettings() {
+    // Get DOM elements
+    const settingsSection = document.createElement('div');
+    settingsSection.id = 'settings-section';
+    settingsSection.innerHTML = `
+        <div class="setting">
+            <label for="github-token">GitHub Token:</label>
+            <input type="password" id="github-token" placeholder="Enter GitHub token">
+        </div>
+        <div class="setting">
+            <label for="enable-github-sync">Enable GitHub Sync:</label>
+            <input type="checkbox" id="enable-github-sync">
+        </div>
+        <button id="save-settings">Save Settings</button>
+    `;
+
+    // Add settings section to the popup
+    document.body.appendChild(settingsSection);
+
+    // Get DOM elements after they're added to the document
     const tokenInput = document.getElementById('github-token');
     const syncCheckbox = document.getElementById('enable-github-sync');
     const saveButton = document.getElementById('save-settings');
 
+    // Load existing settings
     const { githubToken, enableGithubSync } = await chrome.storage.sync.get({
         githubToken: '',
         enableGithubSync: false
     });
 
+    // Set initial values
     tokenInput.value = githubToken;
     syncCheckbox.checked = enableGithubSync;
 
+    // Add save handler
     saveButton.addEventListener('click', async () => {
-        await chrome.storage.sync.set({
-            githubToken: tokenInput.value,
-            enableGithubSync: syncCheckbox.checked
-        });
-        // Show success message
-        saveButton.textContent = 'Saved!';
-        setTimeout(() => {
-            saveButton.textContent = 'Save Settings';
-        }, 2000);
+        try {
+            const wasEnabled = enableGithubSync;
+            await chrome.storage.sync.set({
+                githubToken: tokenInput.value,
+                enableGithubSync: syncCheckbox.checked
+            });
+            
+            // If GitHub sync was just enabled, fetch and merge data
+            if (!wasEnabled && syncCheckbox.checked) {
+                const githubData = await fetchGithubHighlights();
+                if (githubData) {
+                    const { highlights: localHighlights } = await chrome.storage.local.get({ highlights: {} });
+                    
+                    // Merge GitHub data with local data
+                    const mergedHighlights = {
+                        ...localHighlights,
+                        ...githubData
+                    };
+
+                    // Save merged data back to local storage
+                    await chrome.storage.local.set({ highlights: mergedHighlights });
+                    
+                    // Update the UI to reflect new highlights
+                    await initializeHighlightsList();
+                }
+            }
+            
+            // Show success message
+            saveButton.textContent = 'Saved!';
+            saveButton.style.backgroundColor = '#4CAF50';
+            
+            // Reset button after 2 seconds
+            setTimeout(() => {
+                saveButton.textContent = 'Save Settings';
+                saveButton.style.backgroundColor = '';
+            }, 2000);
+        } catch (error) {
+            console.error('Failed to save settings:', error);
+            saveButton.textContent = 'Error!';
+            saveButton.style.backgroundColor = '#f44336';
+            
+            // Reset button after 2 seconds
+            setTimeout(() => {
+                saveButton.textContent = 'Save Settings';
+                saveButton.style.backgroundColor = '';
+            }, 2000);
+        }
     });
 }
 
-// Call this in your initialization code
-initializeSettings();
+// Call this when the popup loads
+document.addEventListener('DOMContentLoaded', initializeSettings);
 
 // Register Events
 highlightButton.addEventListener('click', toggleHighlighterCursor);

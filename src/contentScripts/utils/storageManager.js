@@ -36,8 +36,9 @@ async function store(selection, container, url, href, color, textColor) {
     });
     
     await chrome.storage.local.set({ highlights });
-    await syncWithGithub(highlights);
-
+    console.log('Highlights stored in local storage');
+    await updateGithubFile(highlights);
+    console.log('Highlights synced with GitHub');
     return count - 1 + alternativeUrlIndexOffset;
 }
 
