@@ -11,7 +11,7 @@ let alternativeUrlIndexOffset = 0; // Number of elements stored in the alternati
 async function syncWithGithub(highlights) {
     const { enableGithubSync } = await chrome.storage.sync.get({ enableGithubSync: false });
     if (enableGithubSync) {
-        await updateGithubFile(highlights);
+        updateGithubFile(highlights); // No await - run in background
     }
 }
 
@@ -37,7 +37,7 @@ async function store(selection, container, url, href, color, textColor) {
     
     await chrome.storage.local.set({ highlights });
     console.log('Highlights stored in local storage');
-    await updateGithubFile(highlights);
+    syncWithGithub(highlights); // No await - run in background
     console.log('Highlights synced with GitHub');
     return count - 1 + alternativeUrlIndexOffset;
 }
@@ -60,7 +60,7 @@ async function update(highlightIndex, url, alternativeUrl, newColor, newTextColo
             highlightObject.textColor = newTextColor;
             highlightObject.updatedAt = Date.now();
             await chrome.storage.local.set({ highlights });
-            await syncWithGithub(highlights);
+            syncWithGithub(highlights); // No await - run in background
         }
     }
 }
@@ -124,7 +124,7 @@ async function removeHighlight(highlightIndex, url, alternativeUrl) {
     }
 
     await chrome.storage.local.set({ highlights });
-    await syncWithGithub(highlights);
+    syncWithGithub(highlights); // No await - run in background
 }
 
 // alternativeUrl is optional
@@ -138,7 +138,7 @@ async function clearPage(url, alternativeUrl) {
     }
 
     await chrome.storage.local.set({ highlights });
-    await syncWithGithub(highlights);
+    syncWithGithub(highlights); // No await - run in background
 }
 
 function elementFromQuery(storedQuery) {
